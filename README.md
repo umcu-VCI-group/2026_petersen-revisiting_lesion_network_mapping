@@ -1,1 +1,1 @@
-# 2026_petersen-revisiting_lesion_network_mapping
+This is the analysis code for "Revisiting the methodological foundation of lesion network mapping"
