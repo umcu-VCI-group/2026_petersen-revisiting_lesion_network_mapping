@@ -1,1 +1,1 @@
-This is the analysis code for "Revisiting the methodological foundation of lesion network mapping"
+This is the analysis code for "Permutation-based inference preserves anatomical specificity in lesion network mapping"
