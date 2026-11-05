@@ -1,0 +1,18 @@
+name: lnm-specificity
+channels: [conda-forge]
+dependencies:
+  - python>=3.11
+  - numpy
+  - scipy
+  - pandas
+  - nibabel
+  - nilearn>=0.10
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - joblib
+  - pillow
+  - pip
+  - pip:
+      - yabplot          # cortical surface renders (05 only)
+# PALM (alpha119 or later) runs in MATLAB or Octave and is called by 03_run_palm.sh.

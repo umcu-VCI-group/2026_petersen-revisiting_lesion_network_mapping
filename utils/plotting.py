@@ -1,11 +1,16 @@
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import numpy as np
-import nibabel as nib
-from nilearn import plotting
-from matplotlib.colors import ListedColormap
-import matplotlib.gridspec as gridspec
+"""Two-dimensional figure helpers: cross-domain multimodal comparison figure (Figure 2, S6, S9)
+and per-domain overlap of two significance maps (S7, S15, S19, S20)."""
 from textwrap import fill
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import nibabel as nib
+import numpy as np
+from matplotlib.colors import ListedColormap
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from nilearn import plotting
+
 
 def plot_combined_multimodal_figure(
     binary_dict,
@@ -201,7 +206,7 @@ def plot_combined_multimodal_figure(
                     
                     x_data, y_data = c_j[mask_valid], c_i[mask_valid]
                     if len(x_data) > 5000:
-                        idx_rand = np.random.choice(len(x_data), 5000, replace=False)
+                        idx_rand = np.random.default_rng(0).choice(len(x_data), 5000, replace=False)
                         x_plot, y_plot = x_data[idx_rand], y_data[idx_rand]
                     else:
                         x_plot, y_plot = x_data, y_data
@@ -289,77 +294,107 @@ def plot_combined_multimodal_figure(
 
     return fig
 
-import numpy as np
-import pandas as pd
 
-def calculate_similarity_matrices(binary_dict, continuous_dict=None, keys=None):
-    """Calculates similarity matrices (Dice and Pearson) for a set of brain maps.
+def plot_binary_comparison(binary_dict1, binary_dict2, affine, label_rename_dict=None,
+                           figsize_per_col=6, name1="Map 1", name2="Map 2",
+                           color1='#CC3333', color2='#0077BB',
+                           fontsize=14, bg_img=None):
+    """Per-domain overlay of two significance-mask dicts (red, blue; overlap purple) with Dice."""
+    common_keys = [k for k in binary_dict1 if k in binary_dict2]          # domain order of the inputs
+    n = len(common_keys)
+    if n == 0:
+        raise ValueError("No matching keys found in input dictionaries.")
 
-        Computes a symmetric matrix of Dice similarity coefficients based on binary masks
-        and, optionally, a symmetric matrix of Pearson correlation coefficients based on
-        continuous map values.
+    def get_label(k):
+        return label_rename_dict.get(k, k) if label_rename_dict else k
 
-        Args:
-            binary_dict (dict): A dictionary where keys are ROI names and values are 3D 
-                numpy arrays representing binary masks.
-            continuous_dict (dict, optional): A dictionary where keys are ROI names 
-                (matching binary_dict) and values are 3D numpy arrays representing 
-                continuous values (e.g., probability maps). Defaults to None.
-            keys (list of str, optional): A specific list of keys to include in the 
-                calculation. If None, all keys in binary_dict are used in sorted order. 
-                Defaults to None.
+    n_rows = 2
+    n_cols = int(np.ceil(n / n_rows))
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(figsize_per_col * n_cols, figsize_per_col * n_rows))
+    plt.subplots_adjust(wspace=0.0, hspace=0.2)
+    axes_flat = axes.flatten() if n > 1 else [axes]
+    dice_scores = np.zeros(n)
 
-        Returns:
-            tuple: A tuple containing:
-                - dice_df (pandas.DataFrame): A square DataFrame containing pairwise Dice 
-                coefficients.
-                - pearson_df (pandas.DataFrame or None): A square DataFrame containing 
-                pairwise Pearson correlation coefficients. Returns None if 
-                continuous_dict is not provided.
-        """
-    if keys is None:
-        keys = sorted(list(binary_dict.keys()))
-    
-    n = len(keys)
-    dice_matrix = np.zeros((n, n))
-    pearson_matrix = np.zeros((n, n)) if continuous_dict else None
+    for idx, key in enumerate(common_keys):
+        ax = axes_flat[idx]
+        mask1 = binary_dict1[key].astype(bool)
+        mask2 = binary_dict2[key].astype(bool)
+        img1 = nib.Nifti1Image(mask1.astype(np.float32), affine)
+        img2 = nib.Nifti1Image(mask2.astype(np.float32), affine)
+        cmap_i = ListedColormap([color1])  # dict1
+        cmap_j = ListedColormap([color2])  # dict2
 
-    for i, key_i in enumerate(keys):
-        # Diagonal Dice is always 1.0
-        dice_matrix[i, i] = 1.0
-        if pearson_matrix is not None:
-            pearson_matrix[i, i] = 1.0
-            
-        for j in range(i + 1, n):
-            key_j = keys[j]
-            
-            # --- Dice Calculation ---
-            mask_i = binary_dict[key_i].astype(bool)
-            mask_j = binary_dict[key_j].astype(bool)
-            inter = (mask_i & mask_j).sum()
-            tot = mask_i.sum() + mask_j.sum()
-            dice = 2 * inter / tot if tot > 0 else 0.0
-            
-            dice_matrix[i, j] = dice
-            dice_matrix[j, i] = dice # Symmetrical
-            
-            # --- Pearson Calculation ---
-            if pearson_matrix is not None:
-                if key_i in continuous_dict and key_j in continuous_dict:
-                    c_i = continuous_dict[key_i].flatten()
-                    c_j = continuous_dict[key_j].flatten()
-                    valid_mask = (np.isfinite(c_i) & np.isfinite(c_j))
-                    
-                    if valid_mask.sum() > 10:
-                        r = np.corrcoef(c_i[valid_mask], c_j[valid_mask])[0, 1]
-                    else:
-                        r = np.nan
-                    
-                    pearson_matrix[i, j] = r
-                    pearson_matrix[j, i] = r # Symmetrical
+        if mask1.any() or mask2.any():
+            if mask1.any():
+                display = plotting.plot_stat_map(
+                    img1, bg_img=bg_img, axes=ax, display_mode='z', cut_coords=[2],
+                    cmap=cmap_i, colorbar=False, annotate=False, draw_cross=False,
+                    threshold=0.1, transparency=0.6, dim=0.8, black_bg=False, radiological=True)
+                if mask2.any():
+                    display.add_overlay(img2, cmap=cmap_j, transparency=0.6)
+            else:
+                plotting.plot_stat_map(
+                    img2, bg_img=bg_img, axes=ax, display_mode='z', cut_coords=[2],
+                    cmap=cmap_j, colorbar=False, annotate=False, draw_cross=False,
+                    threshold=0.1, transparency=0.6, dim=0.8, black_bg=False, radiological=True)
+            if idx == 0:
+                ax.text(0.10, 0.92, 'R', transform=ax.transAxes, fontsize=fontsize * 0.6, fontweight='bold')
+                ax.text(0.90, 0.92, 'L', transform=ax.transAxes, fontsize=fontsize * 0.6, fontweight='bold', ha='right')
+        else:
+            # No surviving voxels in EITHER mask -> label the facet n.s. (not a black slice).
+            ax.set_facecolor('white')
+            ax.text(0.5, 0.5, 'n.s.', transform=ax.transAxes, ha='center', va='center',
+                    fontsize=fontsize * 1.4, fontweight='bold', color='0.4')
+            ax.set_xticks([]); ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
 
-    # Convert to DataFrames for easier indexing/labeling
-    dice_df = pd.DataFrame(dice_matrix, index=keys, columns=keys)
-    pearson_df = pd.DataFrame(pearson_matrix, index=keys, columns=keys) if pearson_matrix is not None else None
-    
-    return dice_df, pearson_df
+        ax.set_title(get_label(key), fontsize=fontsize, fontweight='bold', pad=20, loc='center')
+
+        inter = (mask1 & mask2).sum()
+        tot = mask1.sum() + mask2.sum()
+        d = 2.0 * inter / tot if tot > 0 else 0.0
+        dice_scores[idx] = d
+        if mask1.any() and mask2.any():
+            ax.text(0.9, 0.05, f"Dice\n{d:.2f}", transform=ax.transAxes,
+                    ha='center', va='center', fontsize=fontsize,
+                    fontweight='bold', color='black')
+        elif mask1.any() != mask2.any():                                     # one map without significant voxels
+            ax.text(0.5, 1.01, f"{name2 if mask1.any() else name1}: n.s.", transform=ax.transAxes,
+                    ha='center', va='bottom', fontsize=fontsize * 0.6, fontweight='bold', color='0.4')
+
+    for i in range(n, len(axes_flat)):
+        axes_flat[i].axis('off')
+
+    # Small two-colour KEY naming only the two maps (replaces the family pretty-name title).
+    legend_handles = [Patch(facecolor=color1, edgecolor='none', label=name1),
+                      Patch(facecolor=color2, edgecolor='none', label=name2)]
+    fig.legend(handles=legend_handles, loc='lower center', ncol=2, frameon=False,
+               fontsize=fontsize, bbox_to_anchor=(0.5, 0.02))
+    return fig, axes, dice_scores, common_keys
+
+
+
+def corr_heatmap(M, labels, rowlab, collab, title=None):
+    """Annotated domain x domain correlation matrix (S11, S14, S21); diagonal outlined."""
+    M = np.asarray(M, float); n = len(M)
+    fig, ax = plt.subplots(figsize=(4.6, 4.0))
+    im = ax.imshow(M, vmin=-1, vmax=1, cmap="RdBu_r")
+    for i in range(n):
+        for j in range(n):
+            if np.isfinite(M[i, j]):
+                ax.text(j, i, f"{M[i, j]:.2f}", ha="center", va="center", fontsize=6.5,
+                        color="white" if abs(M[i, j]) > 0.6 else "black")
+        ax.add_patch(plt.Rectangle((i - .5, i - .5), 1, 1, fill=False, ec="black", lw=1.1))
+    ax.set_xticks(range(n)); ax.set_yticks(range(n))
+    ax.set_xticklabels(labels, rotation=40, ha="right"); ax.set_yticklabels(labels)
+    ax.set_xlabel(collab); ax.set_ylabel(rowlab); ax.tick_params(length=0)
+    for s_ in ax.spines.values():
+        s_.set_visible(False)
+    if title:
+        ax.set_title(title, fontsize=8.5)
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, extend="both", ticks=[-1, 0, 1])
+    cb.ax.tick_params(labelsize=8, length=2); cb.set_label("r", fontsize=9)
+    fig.tight_layout()
+    return fig
