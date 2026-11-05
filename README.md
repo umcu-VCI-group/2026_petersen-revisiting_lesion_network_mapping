@@ -1,4 +1,4 @@
-# Analysis code for "[Ensuring anatomical specificity in lesion network mapping: a multicentre study of 2,950 stroke patients](https://www.medrxiv.org/content/10.64898/2026.02.16.26346377)"
+## Analysis code for "[Ensuring anatomical specificity in lesion network mapping: a multicentre study of 2,950 stroke patients](https://www.medrxiv.org/content/10.64898/2026.02.16.26346377)"
 
 > [!TIP]
 > We are currently developing [Lacuna](https://lacuna-py.readthedocs.io/en/latest/), an open-source Python package that implements the lesion network mapping workflow recommended in the manuscript, from lesion masks to lesion network maps, including group-level inference based on label permutation testing, within a single package. Lacuna was not used for the analyses reported here, which were performed with Lead-DBS and PALM (see below).
