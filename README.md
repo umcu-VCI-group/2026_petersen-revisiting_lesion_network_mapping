@@ -16,7 +16,7 @@ data/templates/MNI152_T1_2mm_Brain(_Mask).nii.gz   (+ uncompressed mask .nii for
 data/atlases/                                Schaefer-1000, Tian S4, Buckner-7 (peak labels)
 ```
 
-The clinical data and lesion masks belong to the contributing cohorts and are not distributed.
+The clinical data and lesion masks belong to the contributing cohorts and are not distributed. For the degree map and GSP1000 connecitivity matrix please see [here](https://github.com/dutchconnectomelab/lesionnetworkmapping/tree/main/data/degree).
 
 ## Pipeline
 
